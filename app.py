@@ -133,8 +133,8 @@ import datetime
 import requests
 
 # --- CONFIGURATION PAYTECH ---
-PAYTECH_API_KEY = "267bf57a799bd46749bc82949134515b1ea1c3fe1dece4f478a2d24c4f37e1de"
-PAYTECH_API_SECRET = "785a0d5093f460a2e8af877f8cc7dc8d76ec144e645e086689fa1dcb28818e88"
+PAYTECH_API_KEY = st.secrets["PAYTECH_API_KEY"]
+PAYTECH_API_SECRET = st.secrets["PAYTECH_API_SECRET"]
 PAYTECH_URL = "https://paytech.sn/api/payment/request-payment"
 
 st.set_page_config(page_title="AMEEK - Test Paiement", layout="wide")
