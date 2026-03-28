@@ -250,6 +250,7 @@ elif st.session_state['etape'] == 'paiement':
 # --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE (Design test.jpeg) ---
 # --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE ---
 # --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE (CODE COMPLET CORRIGÉ) ---
+# --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE (CODE COMPLET CORRIGÉ V2) ---
 elif st.session_state['etape'] == 'carte':
     data = st.session_state['temp_data']
     largeur, hauteur = 1000, 600
@@ -258,30 +259,31 @@ elif st.session_state['etape'] == 'carte':
     color_green = (11, 108, 62)
 
     try:
-        # 1. POLICES
-        font_large = ImageFont.truetype("font_bold.ttf", 60)
-        font_sub = ImageFont.truetype("font_bold.ttf", 28)
-        font_label = ImageFont.truetype("font_bold.ttf", 32)
-        font_main = ImageFont.truetype("font.ttf", 32)
-        font_status = ImageFont.truetype("font_bold.ttf", 40)
-        font_url = ImageFont.truetype("font_bold.ttf", 25) # Un peu plus petit pour le N
+        # 1. POLICES (Ajustées pour la lisibilité)
+        font_large = ImageFont.truetype("font_bold.ttf", 60) # AMEEK
+        font_sub = ImageFont.truetype("font_bold.ttf", 28)   # Amicale...
+        font_label = ImageFont.truetype("font_bold.ttf", 32)  # Libellés (gras)
+        font_main = ImageFont.truetype("font.ttf", 35)        # Réponses (normal, plus grand)
+        font_url = ImageFont.truetype("font_bold.ttf", 28)    # URL en bas
 
         # 2. LOGOS
         logo = Image.open("logo.jpeg").resize((140, 140))
         carte.paste(logo, (30, 20))
         carte.paste(logo, (largeur-170, 20))
 
-        # 3. TITRES CENTRÉS
+        # 3. TEXTES D'EN-TÊTE CENTRÉS
+        # AMEEK
         bbox1 = dessin.textbbox((0, 0), "AMEEK", font=font_large)
         w1 = bbox1[2] - bbox1[0]
         dessin.text(((largeur - w1) / 2, 35), "AMEEK", fill=color_green, font=font_large)
 
+        # AMICALE...
         txt2 = "AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI"
         bbox2 = dessin.textbbox((0, 0), txt2, font=font_sub)
         w2 = bbox2[2] - bbox2[0]
         dessin.text(((largeur - w2) / 2, 110), txt2, fill="black", font=font_sub)
 
-        # 4. BARRE VERTE
+        # 4. BARRE VERTE ET TITRE
         barre_y = 175
         dessin.rectangle([0, barre_y, largeur, barre_y + 70], fill=color_green)
         txt_membre = "CARTE MEMBRE DE L'AMEEK"
@@ -289,60 +291,50 @@ elif st.session_state['etape'] == 'carte':
         w3, h3 = bbox3[2] - bbox3[0], bbox3[3] - bbox3[1]
         dessin.text(((largeur - w3) / 2, barre_y + (70 - h3) / 2 - 5), txt_membre, fill="white", font=font_sub)
 
-        # 5. PHOTO
+        # 5. PHOTO (Ajustée pour plus d'espace)
         photo_raw = Image.open(io.BytesIO(data['photo']))
         photo_img = ImageOps.fit(photo_raw, (280, 330)) 
         carte.paste(photo_img, (40, barre_y + 85))
-# 6. INFOS À DROITE (Avec ajustement automatique de la taille)
-        x_label = 360
-        x_value = 620 
-        y_start = barre_y + 90
-        step = 50
-        max_width = 350  # Largeur maximale autorisée pour le texte à droite
 
-        champs = [
-            ("Prénom :", data.get('prenom', '')),
-            ("Noms :", data.get('noms', '')),
-            ("Tel :", data.get('tel', ''))
-        ]
+        # 6. INFOS À DROITE (Organisation en colonnes alignées)
+        x_txt = 360  # Position X commune pour les textes à droite
+        y_start = barre_y + 95
+        step_normal = 55      # Espace entre les lignes normales
+        step_etablissement = 40 # Espace réduit pour le nom de l'établissement
+
+        # Infos de base
+        dessin.text((x_txt, y_start), f"Prénom : {data['prenom']}", fill="black", font=font_main)
+        dessin.text((x_txt, y_start + step_normal), f"Noms : {data['noms']}", fill="black", font=font_main)
+        dessin.text((x_txt, y_start + (2 * step_normal)), f"Tel : {data['tel']}", fill="black", font=font_main)
         
+        # Gestion dynamique de l'établissement (sur deux lignes)
+        y_etab_label = y_start + (3 * step_normal)
         if data['statut'] == "ÉTUDIANT":
-            champs.append(("Université :", data.get('universite', '')))
-            champs.append(("Faculté :", data.get('etablissement', '')))
+            dessin.text((x_txt, y_etab_label), "Université / École :", fill="black", font=font_label)
+            # Affichage de la réponse sur la ligne d'en dessous, en normal
+            dessin.text((x_txt, y_etab_label + step_etablissement), str(data['universite']), fill="black", font=font_main)
         else:
-            champs.append(("Établissement :", data.get('etablissement', '')))
+            dessin.text((x_txt, y_etab_label), "Établissement / Lycée :", fill="black", font=font_label)
+            # Affichage de la réponse sur la ligne d'en dessous, en normal
+            dessin.text((x_txt, y_etab_label + step_etablissement), str(data['etablissement']), fill="black", font=font_main)
+        
+        # --- MODIFICATION 1 : SUPPRESSION DE ELEVE [X] ---
+        # dessin.text((x_txt, y_start + 265), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
 
-        for i, (label, value) in enumerate(champs):
-            curr_y = y_start + (i * step)
-            dessin.text((x_label, curr_y), label, fill="black", font=font_label)
-            
-            txt_val = str(value)
-            taille_police = 32  # Taille de départ
-            current_font = ImageFont.truetype("font.ttf", taille_police)
-            
-            # BOUCLE MAGIQUE : Réduit la taille tant que le texte dépasse
-            w_text = dessin.textbbox((0, 0), txt_val, font=current_font)[2]
-            while w_text > max_width and taille_police > 18:
-                taille_police -= 2
-                current_font = ImageFont.truetype("font.ttf", taille_police)
-                w_text = dessin.textbbox((0, 0), txt_val, font=current_font)[2]
-                
-            dessin.text((x_value, curr_y + 5), txt_val, fill="black", font=current_font)
-        # Statut coché
-        dessin.text((x_label, y_start + 265), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
-
-        # 7. QR CODE ET URL (CORRECTION DU N)
+        # 7. QR CODE ET FOOTER (Ajusté pour que le 'N' ne soit pas coupé)
         qr = qrcode.make("https://www.ameek.sn").resize((130, 130))
         carte.paste(qr, (largeur-200, 400))
         dessin.text((largeur-185, 535), "VALIDER", fill=color_green, font=font_sub)
+        
         # Position x-240 pour que le N de .SN soit bien visible
         dessin.text((largeur-240, 565), "WWW.AMEEK.SN", fill=color_green, font=font_url)
 
-        # --- AFFICHAGE ---
+        # --- AFFICHAGE ET TÉLÉCHARGEMENT ---
         st.image(carte, use_container_width=True)
+        
         buf = io.BytesIO()
         carte.save(buf, format="PNG")
         st.download_button("📥 TÉLÉCHARGER MA CARTE", buf.getvalue(), f"Carte_{data['noms']}.png", "image/png")
 
     except Exception as e:
-        st.error(f"Erreur : {e}")
+        st.error(f"Erreur d'image : {e}. Assurez-vous d'avoir 'font.ttf', 'font_bold.ttf' et 'logo.jpeg' sur GitHub.")
