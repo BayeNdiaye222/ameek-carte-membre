@@ -186,6 +186,7 @@ if 'etape' not in st.session_state:
     st.session_state['etape'] = 'formulaire'
 
 # --- ÉTAPE 1 : FORMULAIRE ---
+# --- ÉTAPE 1 : FORMULAIRE D'INSCRIPTION ---
 if st.session_state['etape'] == 'formulaire':
     st.image("logo.jpeg", width=100)
     st.title("Formulaire d'Adhésion AMEEK")
@@ -193,28 +194,45 @@ if st.session_state['etape'] == 'formulaire':
     with st.form("inscription"):
         prenom = st.text_input("Prénom")
         noms = st.text_input("Noms")
-        tel = st.text_input("Téléphone")
+        tel = st.text_input("Téléphone (ex: 77 123 45 67)")
+        
+        # Nouveaux champs ajoutés
+        universite = st.text_input("Université / Ville d'étude")
+        etablissement = st.text_input("Établissement / Faculté / École")
+        
         statut = st.radio("Statut", ["ÉTUDIANT", "ÉLÈVE"])
-        photo = st.file_uploader("Votre Photo", type=['jpg', 'jpeg', 'png'])
+        photo = st.file_uploader("Votre Photo d'identité (fond uni de préférence)", type=['jpg', 'jpeg', 'png'])
         
         valider = st.form_submit_button("VALIDER ET PAYER (5 000 FCFA)")
 
     if valider:
-        if not prenom or not noms or not photo:
-            st.warning("Veuillez remplir tous les champs.")
+        # Vérification que TOUS les champs sont remplis
+        if not prenom or not noms or not tel or not universite or not etablissement or not photo:
+            st.warning("⚠️ Veuillez remplir tous les champs et télécharger votre photo.")
         else:
+            # On prépare l'appel à PayTech
             res = initier_paiement(f"{prenom} {noms}")
+            
             if "redirect_url" in res:
+                # Sauvegarde de l'URL de paiement
                 st.session_state['pay_url'] = res['redirect_url']
+                
+                # SAUVEGARDE DE TOUTES LES DONNÉES (y compris les nouvelles)
                 st.session_state['temp_data'] = {
-                    "prenom": prenom, "noms": noms, "tel": tel, 
-                    "statut": statut, "photo": photo.read()
+                    "prenom": prenom,
+                    "noms": noms,
+                    "tel": tel,
+                    "universite": universite,   # <--- Nouveau
+                    "etablissement": etablissement, # <--- Nouveau
+                    "statut": statut,
+                    "photo": photo.read()       # On lit les octets de l'image
                 }
+                
+                # Passage à l'étape suivante
                 st.session_state['etape'] = 'paiement'
                 st.rerun()
             else:
-                st.error(f"Erreur PayTech : {res.get('error', 'Inconnue')}")
-
+                st.error(f"Erreur lors de la connexion à PayTech : {res.get('error', 'Vérifiez vos clés API')}")
 # --- ÉTAPE 2 : ATTENTE PAIEMENT ---
 elif st.session_state['etape'] == 'paiement':
     st.info("ℹ️ Cliquez sur le lien ci-dessous pour effectuer votre paiement.")
@@ -235,12 +253,12 @@ elif st.session_state['etape'] == 'carte':
     color_green = (11, 108, 62)
 
     try:
-        # 1. CHARGEMENT DES POLICES (Noms renommés)
-        # Si font.ttf n'est pas trouvé, le code affichera l'erreur en bas
-        font_large = ImageFont.truetype("font_bold.ttf", 60) # AMEEK
-        font_sub = ImageFont.truetype("font_bold.ttf", 30)   # Amicale...
-        font_main = ImageFont.truetype("font.ttf", 38)        # Infos
-        font_status = ImageFont.truetype("font_bold.ttf", 42)# Statut
+        # 1. POLICES (Tailles légèrement réduites pour faire de la place)
+        font_large = ImageFont.truetype("font_bold.ttf", 60)
+        font_sub = ImageFont.truetype("font_bold.ttf", 28)
+        font_main = ImageFont.truetype("font.ttf", 32)        # Texte normal
+        font_label = ImageFont.truetype("font_bold.ttf", 32)  # Libellés (Prénom:, Nom:, etc.)
+        font_status = ImageFont.truetype("font_bold.ttf", 40)
 
         # 2. LOGOS
         logo = Image.open("logo.jpeg").resize((140, 140))
@@ -248,53 +266,60 @@ elif st.session_state['etape'] == 'carte':
         carte.paste(logo, (largeur-170, 20))
 
         # 3. TEXTES D'EN-TÊTE CENTRÉS
-        # Centrage AMEEK
-        bbox1 = dessin.textbbox((0, 0), "AMEEK", font=font_large)
-        w1 = bbox1[2] - bbox1[0]
-        dessin.text(((largeur - w1) / 2, 35), "AMEEK", fill=color_green, font=font_large)
+        for text, font, y, color in [
+            ("AMEEK", font_large, 35, color_green),
+            ("AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI", font_sub, 110, "black")
+        ]:
+            w = dessin.textbbox((0, 0), text, font=font)[2]
+            dessin.text(((largeur - w) / 2, y), text, fill=color, font=font)
 
-        # Centrage Sous-titre
-        txt2 = "AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI"
-        bbox2 = dessin.textbbox((0, 0), txt2, font=font_sub)
-        w2 = bbox2[2] - bbox2[0]
-        dessin.text(((largeur - w2) / 2, 110), txt2, fill="black", font=font_sub)
-
-        # 4. BARRE VERTE ET TEXTE
+        # 4. BARRE VERTE
         barre_y = 175
-        dessin.rectangle([0, barre_y, largeur, barre_y + 75], fill=color_green)
-        txt3 = "CARTE MEMBRE DE L'AMEEK"
-        bbox3 = dessin.textbbox((0, 0), txt3, font=font_sub)
+        dessin.rectangle([0, barre_y, largeur, barre_y + 70], fill=color_green)
+        txt_carte = "CARTE MEMBRE DE L'AMEEK"
+        bbox3 = dessin.textbbox((0, 0), txt_carte, font=font_sub)
         w3, h3 = bbox3[2] - bbox3[0], bbox3[3] - bbox3[1]
-        dessin.text(((largeur - w3) / 2, barre_y + (75 - h3) / 2 - 5), txt3, fill="white", font=font_sub)
+        dessin.text(((largeur - w3) / 2, barre_y + (70 - h3) / 2 - 5), txt_carte, fill="white", font=font_sub)
 
-        # 5. PHOTO (Alignée sous la barre verte)
+        # 5. PHOTO (Positionnée à gauche)
         photo_raw = Image.open(io.BytesIO(data['photo']))
-        photo_img = ImageOps.fit(photo_raw, (300, 350))
-        carte.paste(photo_img, (40, barre_y + 75))
+        photo_img = ImageOps.fit(photo_raw, (280, 330)) 
+        carte.paste(photo_img, (40, barre_y + 85))
 
-        # 6. INFOS À DROITE
-        x_txt = 380
-        y_start = barre_y + 110
-        dessin.text((x_txt, y_start), f"Tel : {data['tel']}", fill="black", font=font_main)
-        dessin.text((x_txt, y_start + 70), f"Prénom : {data['prenom']}", fill="black", font=font_main)
-        dessin.text((x_txt, y_start + 140), f"Noms : {data['noms']}", fill="black", font=font_main)
+        # 6. INFOS À DROITE (Alignement propre)
+        x_label = 360  # Colonne des titres
+        x_value = 580  # Colonne des données
+        y_start = barre_y + 90
+        step = 48      # Espace entre les lignes
+
+        # Liste des champs à afficher
+        champs = [
+            ("Prénom :", data.get('prenom', '')),
+            ("Nom :", data.get('noms', '')),
+            ("Tel :", data.get('tel', '')),
+            ("Université :", data.get('universite', '')),
+            ("Établissement :", data.get('etablissement', ''))
+        ]
+
+        for i, (label, value) in enumerate(champs):
+            curr_y = y_start + (i * step)
+            dessin.text((x_label, curr_y), label, fill="black", font=font_label)
+            dessin.text((x_value, curr_y), str(value), fill="black", font=font_main)
         
         # Statut Vert
-        dessin.text((x_txt, y_start + 230), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
+        dessin.text((x_label, y_start + 255), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
 
-        # 7. QR CODE
-        qr = qrcode.make("https://www.ameek.sn").resize((140, 140))
-        carte.paste(qr, (largeur-210, 380))
-        dessin.text((largeur-190, 525), "VALIDER", fill=color_green, font=font_sub)
-        dessin.text((largeur-235, 555), "WWW.AMEEK.SN", fill=color_green, font=font_sub)
+        # 7. QR CODE ET FOOTER
+        qr = qrcode.make("https://www.ameek.sn").resize((130, 130))
+        carte.paste(qr, (largeur-200, 400))
+        dessin.text((largeur-185, 535), "VALIDER", fill=color_green, font=font_sub)
+        dessin.text((largeur-225, 565), "WWW.AMEEK.SN", fill=color_green, font=font_sub)
 
-        # AFFICHAGE
+        # --- AFFICHAGE ET TÉLÉCHARGEMENT ---
         st.image(carte, use_container_width=True)
-        
-        # BOUTON TÉLÉCHARGEMENT
         buf = io.BytesIO()
         carte.save(buf, format="PNG")
         st.download_button("📥 TÉLÉCHARGER MA CARTE", buf.getvalue(), f"Carte_{data['noms']}.png", "image/png")
 
     except Exception as e:
-        st.error(f"Erreur : {e}. Vérifiez que 'font.ttf' et 'font_bold.ttf' sont à la racine de votre GitHub.")
+        st.error(f"Erreur : {e}. Vérifiez vos fichiers de police sur GitHub.")
