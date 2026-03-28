@@ -314,11 +314,16 @@ elif st.session_state['etape'] == 'carte':
         # Statut Vert (décalé vers le bas pour l'équilibre)
         dessin.text((x_label, y_start + 265), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
 
-        # 7. QR CODE ET FOOTER
+        # 7. QR CODE ET FOOTER (Ajusté pour que le 'N' ne soit pas coupé)
         qr = qrcode.make("https://www.ameek.sn").resize((130, 130))
         carte.paste(qr, (largeur-200, 400))
+        
+        # On utilise une police un peu plus petite (25 au lieu de 28) pour l'URL
+        font_url = ImageFont.truetype("font_bold.ttf", 25) 
+
         dessin.text((largeur-185, 535), "VALIDER", fill=color_green, font=font_sub)
-        dessin.text((largeur-225, 565), "WWW.AMEEK.SN", fill=color_green, font=font_sub)
+        # On décale à 240 pour laisser de la place au 'N'
+        dessin.text((largeur-240, 565), "WWW.AMEEK.SN", fill=color_green, font=font_url)
 
         # --- AFFICHAGE ET TÉLÉCHARGEMENT ---
         st.image(carte, use_container_width=True)
