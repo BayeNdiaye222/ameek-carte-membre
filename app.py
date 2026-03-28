@@ -186,52 +186,45 @@ if 'etape' not in st.session_state:
     st.session_state['etape'] = 'formulaire'
 
 # --- ÉTAPE 1 : FORMULAIRE ---
-# --- ÉTAPE 1 : FORMULAIRE D'INSCRIPTION DYNAMIQUE ---
+# --- ÉTAPE 1 : FORMULAIRE DYNAMIQUE CORRIGÉ ---
 if st.session_state['etape'] == 'formulaire':
     st.image("logo.jpeg", width=100)
     st.title("Formulaire d'Adhésion AMEEK")
     
+    # 1. On sort le statut du formulaire pour qu'il soit interactif en temps réel
+    statut = st.radio("Vous êtes :", ["ÉTUDIANT", "ÉLÈVE"], horizontal=True)
+
+    # 2. Maintenant on ouvre le formulaire
     with st.form("inscription"):
         prenom = st.text_input("Prénom")
         noms = st.text_input("Noms")
         tel = st.text_input("Téléphone")
         
-        # Choix du statut d'abord
-        statut = st.radio("Vous êtes :", ["ÉTUDIANT", "ÉLÈVE"])
-        
-        # Initialisation des variables pour éviter les erreurs
-        universite = ""
-        etablissement = ""
-
-        # CONDITION DYNAMIQUE
+        # 3. Le champ s'adapte instantanément ici
         if statut == "ÉTUDIANT":
             universite = st.text_input("Université / École Supérieure")
             etablissement = st.text_input("Faculté / Département")
         else:
+            # Pour un élève, on ne demande que l'établissement
             etablissement = st.text_input("Lycée / Collège / École")
-            universite = "N/A" # Pas besoin d'université pour un élève
+            universite = "N/A"
 
-        photo = st.file_uploader("Votre Photo", type=['jpg', 'jpeg', 'png'])
+        photo = st.file_uploader("Votre Photo d'identité", type=['jpg', 'jpeg', 'png'])
+        
         valider = st.form_submit_button("VALIDER ET PAYER (5 000 FCFA)")
 
+    # 4. Traitement après validation
     if valider:
-        # Vérification adaptée selon le statut
         if not prenom or not noms or not photo or not etablissement:
-            st.warning("⚠️ Veuillez remplir tous les champs obligatoires.")
+            st.warning("⚠️ Veuillez remplir tous les champs avant de valider.")
         else:
             res = initier_paiement(f"{prenom} {noms}")
             if "redirect_url" in res:
                 st.session_state['pay_url'] = res['redirect_url']
-                
-                # On stocke les données
                 st.session_state['temp_data'] = {
-                    "prenom": prenom,
-                    "noms": noms,
-                    "tel": tel,
-                    "universite": universite,
-                    "etablissement": etablissement,
-                    "statut": statut,
-                    "photo": photo.read()
+                    "prenom": prenom, "noms": noms, "tel": tel,
+                    "universite": universite, "etablissement": etablissement,
+                    "statut": statut, "photo": photo.read()
                 }
                 st.session_state['etape'] = 'paiement'
                 st.rerun()
