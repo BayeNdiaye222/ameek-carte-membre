@@ -186,7 +186,7 @@ if 'etape' not in st.session_state:
     st.session_state['etape'] = 'formulaire'
 
 # --- ÉTAPE 1 : FORMULAIRE ---
-# --- ÉTAPE 1 : FORMULAIRE D'INSCRIPTION ---
+# --- ÉTAPE 1 : FORMULAIRE D'INSCRIPTION DYNAMIQUE ---
 if st.session_state['etape'] == 'formulaire':
     st.image("logo.jpeg", width=100)
     st.title("Formulaire d'Adhésion AMEEK")
@@ -194,41 +194,45 @@ if st.session_state['etape'] == 'formulaire':
     with st.form("inscription"):
         prenom = st.text_input("Prénom")
         noms = st.text_input("Noms")
-        tel = st.text_input("Téléphone (ex: 77 123 45 67)")
+        tel = st.text_input("Téléphone")
         
-        # Nouveaux champs ajoutés
-        universite = st.text_input("Université / Ville d'étude")
-        etablissement = st.text_input("Établissement / Faculté / École")
+        # Choix du statut d'abord
+        statut = st.radio("Vous êtes :", ["ÉTUDIANT", "ÉLÈVE"])
         
-        statut = st.radio("Statut", ["ÉTUDIANT", "ÉLÈVE"])
-        photo = st.file_uploader("Votre Photo d'identité (fond uni de préférence)", type=['jpg', 'jpeg', 'png'])
-        
+        # Initialisation des variables pour éviter les erreurs
+        universite = ""
+        etablissement = ""
+
+        # CONDITION DYNAMIQUE
+        if statut == "ÉTUDIANT":
+            universite = st.text_input("Université / École Supérieure")
+            etablissement = st.text_input("Faculté / Département")
+        else:
+            etablissement = st.text_input("Lycée / Collège / École")
+            universite = "N/A" # Pas besoin d'université pour un élève
+
+        photo = st.file_uploader("Votre Photo", type=['jpg', 'jpeg', 'png'])
         valider = st.form_submit_button("VALIDER ET PAYER (5 000 FCFA)")
 
     if valider:
-        # Vérification que TOUS les champs sont remplis
-        if not prenom or not noms or not tel or not universite or not etablissement or not photo:
-            st.warning("⚠️ Veuillez remplir tous les champs et télécharger votre photo.")
+        # Vérification adaptée selon le statut
+        if not prenom or not noms or not photo or not etablissement:
+            st.warning("⚠️ Veuillez remplir tous les champs obligatoires.")
         else:
-            # On prépare l'appel à PayTech
             res = initier_paiement(f"{prenom} {noms}")
-            
             if "redirect_url" in res:
-                # Sauvegarde de l'URL de paiement
                 st.session_state['pay_url'] = res['redirect_url']
                 
-                # SAUVEGARDE DE TOUTES LES DONNÉES (y compris les nouvelles)
+                # On stocke les données
                 st.session_state['temp_data'] = {
                     "prenom": prenom,
                     "noms": noms,
                     "tel": tel,
-                    "universite": universite,   # <--- Nouveau
-                    "etablissement": etablissement, # <--- Nouveau
+                    "universite": universite,
+                    "etablissement": etablissement,
                     "statut": statut,
-                    "photo": photo.read()       # On lit les octets de l'image
+                    "photo": photo.read()
                 }
-                
-                # Passage à l'étape suivante
                 st.session_state['etape'] = 'paiement'
                 st.rerun()
             else:
@@ -245,6 +249,7 @@ elif st.session_state['etape'] == 'paiement':
 
 # --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE (Design test.jpeg) ---
 # --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE ---
+# --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE (CODE COMPLET CORRIGÉ) ---
 elif st.session_state['etape'] == 'carte':
     data = st.session_state['temp_data']
     largeur, hauteur = 1000, 600
@@ -253,31 +258,30 @@ elif st.session_state['etape'] == 'carte':
     color_green = (11, 108, 62)
 
     try:
-        # 1. POLICES (Ajustées pour un espacement pro)
-        font_large = ImageFont.truetype("font_bold.ttf", 60) # AMEEK
-        font_sub = ImageFont.truetype("font_bold.ttf", 28)   # Amicale...
-        font_label = ImageFont.truetype("font_bold.ttf", 32)  # Libellés (gras)
-        font_main = ImageFont.truetype("font.ttf", 32)        # Réponses (normal)
-        font_status = ImageFont.truetype("font_bold.ttf", 40)# Statut
+        # 1. POLICES
+        font_large = ImageFont.truetype("font_bold.ttf", 60)
+        font_sub = ImageFont.truetype("font_bold.ttf", 28)
+        font_label = ImageFont.truetype("font_bold.ttf", 32)
+        font_main = ImageFont.truetype("font.ttf", 32)
+        font_status = ImageFont.truetype("font_bold.ttf", 40)
+        font_url = ImageFont.truetype("font_bold.ttf", 25) # Un peu plus petit pour le N
 
         # 2. LOGOS
         logo = Image.open("logo.jpeg").resize((140, 140))
         carte.paste(logo, (30, 20))
         carte.paste(logo, (largeur-170, 20))
 
-        # 3. TEXTES D'EN-TÊTE CENTRÉS
-        # AMEEK
+        # 3. TITRES CENTRÉS
         bbox1 = dessin.textbbox((0, 0), "AMEEK", font=font_large)
         w1 = bbox1[2] - bbox1[0]
         dessin.text(((largeur - w1) / 2, 35), "AMEEK", fill=color_green, font=font_large)
 
-        # AMICALE...
         txt2 = "AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI"
         bbox2 = dessin.textbbox((0, 0), txt2, font=font_sub)
         w2 = bbox2[2] - bbox2[0]
         dessin.text(((largeur - w2) / 2, 110), txt2, fill="black", font=font_sub)
 
-        # 4. BARRE VERTE ET TITRE
+        # 4. BARRE VERTE
         barre_y = 175
         dessin.rectangle([0, barre_y, largeur, barre_y + 70], fill=color_green)
         txt_membre = "CARTE MEMBRE DE L'AMEEK"
@@ -285,52 +289,57 @@ elif st.session_state['etape'] == 'carte':
         w3, h3 = bbox3[2] - bbox3[0], bbox3[3] - bbox3[1]
         dessin.text(((largeur - w3) / 2, barre_y + (70 - h3) / 2 - 5), txt_membre, fill="white", font=font_sub)
 
-        # 5. PHOTO (Ajustée pour plus d'espace)
+        # 5. PHOTO
         photo_raw = Image.open(io.BytesIO(data['photo']))
         photo_img = ImageOps.fit(photo_raw, (280, 330)) 
         carte.paste(photo_img, (40, barre_y + 85))
 
-        # 6. INFOS À DROITE (Organisation en colonnes alignées)
-        # 6. INFOS À DROITE (Alignement en colonnes strictes)
-        x_label = 360  # Position de l'étiquette (Prénom, Nom, etc.)
-        x_value = 620  # Position de la réponse (on augmente à 620 pour laisser de la place au mot 'Établissement')
+        # 6. INFOS À DROITE (DYNAMIQUE ET ALIGNÉ)
+        x_label = 360
+        x_value = 620 # Grand espace pour éviter que ça colle
         y_start = barre_y + 90
-        step = 48      # Espace vertical entre les lignes
+        step = 50
 
+        # On prépare la liste selon le statut
         champs = [
             ("Prénom :", data.get('prenom', '')),
             ("Noms :", data.get('noms', '')),
-            ("Tel :", data.get('tel', '')),
-            ("Université :", data.get('universite', '')),
-            ("Établissement :", data.get('etablissement', ''))
+            ("Tel :", data.get('tel', ''))
         ]
+        
+        if data['statut'] == "ÉTUDIANT":
+            champs.append(("Université :", data.get('universite', '')))
+            champs.append(("Faculté :", data.get('etablissement', '')))
+        else:
+            champs.append(("Établissement :", data.get('etablissement', '')))
 
         for i, (label, value) in enumerate(champs):
             curr_y = y_start + (i * step)
-            # On dessine le libellé en GRAS
             dessin.text((x_label, curr_y), label, fill="black", font=font_label)
-            # On dessine la valeur en NORMAL, alignée sur la même colonne X
-            dessin.text((x_value, curr_y), str(value), fill="black", font=font_main)
-        # Statut Vert (décalé vers le bas pour l'équilibre)
+            
+            # Ajustement auto si le nom de l'école est trop long
+            txt_val = str(value)
+            current_font = font_main
+            if len(txt_val) > 22:
+                current_font = ImageFont.truetype("font.ttf", 24) # On réduit la taille
+                
+            dessin.text((x_value, curr_y + 5), txt_val, fill="black", font=current_font)
+        
+        # Statut coché
         dessin.text((x_label, y_start + 265), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
 
-        # 7. QR CODE ET FOOTER (Ajusté pour que le 'N' ne soit pas coupé)
+        # 7. QR CODE ET URL (CORRECTION DU N)
         qr = qrcode.make("https://www.ameek.sn").resize((130, 130))
         carte.paste(qr, (largeur-200, 400))
-        
-        # On utilise une police un peu plus petite (25 au lieu de 28) pour l'URL
-        font_url = ImageFont.truetype("font_bold.ttf", 25) 
-
         dessin.text((largeur-185, 535), "VALIDER", fill=color_green, font=font_sub)
-        # On décale à 240 pour laisser de la place au 'N'
+        # Position x-240 pour que le N de .SN soit bien visible
         dessin.text((largeur-240, 565), "WWW.AMEEK.SN", fill=color_green, font=font_url)
 
-        # --- AFFICHAGE ET TÉLÉCHARGEMENT ---
+        # --- AFFICHAGE ---
         st.image(carte, use_container_width=True)
-        
         buf = io.BytesIO()
         carte.save(buf, format="PNG")
         st.download_button("📥 TÉLÉCHARGER MA CARTE", buf.getvalue(), f"Carte_{data['noms']}.png", "image/png")
 
     except Exception as e:
-        st.error(f"Erreur d'image : {e}. Assurez-vous d'avoir 'font.ttf', 'font_bold.ttf' et 'logo.jpeg' sur GitHub.")
+        st.error(f"Erreur : {e}")
