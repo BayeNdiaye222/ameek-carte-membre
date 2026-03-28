@@ -253,12 +253,12 @@ elif st.session_state['etape'] == 'carte':
     color_green = (11, 108, 62)
 
     try:
-        # 1. POLICES (Tailles légèrement réduites pour faire de la place)
-        font_large = ImageFont.truetype("font_bold.ttf", 60)
-        font_sub = ImageFont.truetype("font_bold.ttf", 28)
-        font_main = ImageFont.truetype("font.ttf", 32)        # Texte normal
-        font_label = ImageFont.truetype("font_bold.ttf", 32)  # Libellés (Prénom:, Nom:, etc.)
-        font_status = ImageFont.truetype("font_bold.ttf", 40)
+        # 1. POLICES (Ajustées pour un espacement pro)
+        font_large = ImageFont.truetype("font_bold.ttf", 60) # AMEEK
+        font_sub = ImageFont.truetype("font_bold.ttf", 28)   # Amicale...
+        font_label = ImageFont.truetype("font_bold.ttf", 32)  # Libellés (gras)
+        font_main = ImageFont.truetype("font.ttf", 32)        # Réponses (normal)
+        font_status = ImageFont.truetype("font_bold.ttf", 40)# Statut
 
         # 2. LOGOS
         logo = Image.open("logo.jpeg").resize((140, 140))
@@ -266,36 +266,40 @@ elif st.session_state['etape'] == 'carte':
         carte.paste(logo, (largeur-170, 20))
 
         # 3. TEXTES D'EN-TÊTE CENTRÉS
-        for text, font, y, color in [
-            ("AMEEK", font_large, 35, color_green),
-            ("AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI", font_sub, 110, "black")
-        ]:
-            w = dessin.textbbox((0, 0), text, font=font)[2]
-            dessin.text(((largeur - w) / 2, y), text, fill=color, font=font)
+        # AMEEK
+        bbox1 = dessin.textbbox((0, 0), "AMEEK", font=font_large)
+        w1 = bbox1[2] - bbox1[0]
+        dessin.text(((largeur - w1) / 2, 35), "AMEEK", fill=color_green, font=font_large)
 
-        # 4. BARRE VERTE
+        # AMICALE...
+        txt2 = "AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI"
+        bbox2 = dessin.textbbox((0, 0), txt2, font=font_sub)
+        w2 = bbox2[2] - bbox2[0]
+        dessin.text(((largeur - w2) / 2, 110), txt2, fill="black", font=font_sub)
+
+        # 4. BARRE VERTE ET TITRE
         barre_y = 175
         dessin.rectangle([0, barre_y, largeur, barre_y + 70], fill=color_green)
-        txt_carte = "CARTE MEMBRE DE L'AMEEK"
-        bbox3 = dessin.textbbox((0, 0), txt_carte, font=font_sub)
+        txt_membre = "CARTE MEMBRE DE L'AMEEK"
+        bbox3 = dessin.textbbox((0, 0), txt_membre, font=font_sub)
         w3, h3 = bbox3[2] - bbox3[0], bbox3[3] - bbox3[1]
-        dessin.text(((largeur - w3) / 2, barre_y + (70 - h3) / 2 - 5), txt_carte, fill="white", font=font_sub)
+        dessin.text(((largeur - w3) / 2, barre_y + (70 - h3) / 2 - 5), txt_membre, fill="white", font=font_sub)
 
-        # 5. PHOTO (Positionnée à gauche)
+        # 5. PHOTO (Ajustée pour plus d'espace)
         photo_raw = Image.open(io.BytesIO(data['photo']))
         photo_img = ImageOps.fit(photo_raw, (280, 330)) 
         carte.paste(photo_img, (40, barre_y + 85))
 
-        # 6. INFOS À DROITE (Alignement propre)
-        x_label = 360  # Colonne des titres
-        x_value = 580  # Colonne des données
+        # 6. INFOS À DROITE (Organisation en colonnes alignées)
+        # 6. INFOS À DROITE (Alignement en colonnes strictes)
+        x_label = 360  # Position de l'étiquette (Prénom, Nom, etc.)
+        x_value = 620  # Position de la réponse (on augmente à 620 pour laisser de la place au mot 'Établissement')
         y_start = barre_y + 90
-        step = 48      # Espace entre les lignes
+        step = 48      # Espace vertical entre les lignes
 
-        # Liste des champs à afficher
         champs = [
             ("Prénom :", data.get('prenom', '')),
-            ("Nom :", data.get('noms', '')),
+            ("Noms :", data.get('noms', '')),
             ("Tel :", data.get('tel', '')),
             ("Université :", data.get('universite', '')),
             ("Établissement :", data.get('etablissement', ''))
@@ -303,11 +307,12 @@ elif st.session_state['etape'] == 'carte':
 
         for i, (label, value) in enumerate(champs):
             curr_y = y_start + (i * step)
+            # On dessine le libellé en GRAS
             dessin.text((x_label, curr_y), label, fill="black", font=font_label)
+            # On dessine la valeur en NORMAL, alignée sur la même colonne X
             dessin.text((x_value, curr_y), str(value), fill="black", font=font_main)
-        
-        # Statut Vert
-        dessin.text((x_label, y_start + 255), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
+        # Statut Vert (décalé vers le bas pour l'équilibre)
+        dessin.text((x_label, y_start + 265), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
 
         # 7. QR CODE ET FOOTER
         qr = qrcode.make("https://www.ameek.sn").resize((130, 130))
@@ -317,9 +322,10 @@ elif st.session_state['etape'] == 'carte':
 
         # --- AFFICHAGE ET TÉLÉCHARGEMENT ---
         st.image(carte, use_container_width=True)
+        
         buf = io.BytesIO()
         carte.save(buf, format="PNG")
         st.download_button("📥 TÉLÉCHARGER MA CARTE", buf.getvalue(), f"Carte_{data['noms']}.png", "image/png")
 
     except Exception as e:
-        st.error(f"Erreur : {e}. Vérifiez vos fichiers de police sur GitHub.")
+        st.error(f"Erreur d'image : {e}. Assurez-vous d'avoir 'font.ttf', 'font_bold.ttf' et 'logo.jpeg' sur GitHub.")
