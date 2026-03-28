@@ -293,14 +293,13 @@ elif st.session_state['etape'] == 'carte':
         photo_raw = Image.open(io.BytesIO(data['photo']))
         photo_img = ImageOps.fit(photo_raw, (280, 330)) 
         carte.paste(photo_img, (40, barre_y + 85))
-
-        # 6. INFOS À DROITE (DYNAMIQUE ET ALIGNÉ)
+# 6. INFOS À DROITE (Avec ajustement automatique de la taille)
         x_label = 360
-        x_value = 620 # Grand espace pour éviter que ça colle
+        x_value = 620 
         y_start = barre_y + 90
         step = 50
+        max_width = 350  # Largeur maximale autorisée pour le texte à droite
 
-        # On prépare la liste selon le statut
         champs = [
             ("Prénom :", data.get('prenom', '')),
             ("Noms :", data.get('noms', '')),
@@ -317,14 +316,18 @@ elif st.session_state['etape'] == 'carte':
             curr_y = y_start + (i * step)
             dessin.text((x_label, curr_y), label, fill="black", font=font_label)
             
-            # Ajustement auto si le nom de l'école est trop long
             txt_val = str(value)
-            current_font = font_main
-            if len(txt_val) > 22:
-                current_font = ImageFont.truetype("font.ttf", 24) # On réduit la taille
+            taille_police = 32  # Taille de départ
+            current_font = ImageFont.truetype("font.ttf", taille_police)
+            
+            # BOUCLE MAGIQUE : Réduit la taille tant que le texte dépasse
+            w_text = dessin.textbbox((0, 0), txt_val, font=current_font)[2]
+            while w_text > max_width and taille_police > 18:
+                taille_police -= 2
+                current_font = ImageFont.truetype("font.ttf", taille_police)
+                w_text = dessin.textbbox((0, 0), txt_val, font=current_font)[2]
                 
             dessin.text((x_value, curr_y + 5), txt_val, fill="black", font=current_font)
-        
         # Statut coché
         dessin.text((x_label, y_start + 265), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
 
