@@ -126,21 +126,33 @@
 #         st.rerun()
 import streamlit as st
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageOps, ImageFont
 import io
 import qrcode
 import datetime
 
 # --- 1. CONFIGURATION SÉCURISÉE DES CLÉS ---
-try:
-    PAYTECH_API_KEY = st.secrets["PAYTECH_API_KEY"]
-    PAYTECH_API_SECRET = st.secrets["PAYTECH_API_SECRET"]
-except:
-    st.error("⚠️ Clés API manquantes dans les Secrets Streamlit !")
+# --- 1. CONFIGURATION SÉCURISÉE DES CLÉS ---
+if "PAYTECH_API_KEY" not in st.secrets or "PAYTECH_API_SECRET" not in st.secrets:
+    st.error("❌ Erreur de configuration des Secrets !")
+    st.write("Clés détectées actuellement :", list(st.secrets.keys()))
+    st.info("""
+    **Comment régler ça ?**
+    1. Si tu es sur **Streamlit Cloud** : Va dans `Settings` > `Secrets` et colle ceci :
+       ```toml
+       PAYTECH_API_KEY = "votre_cle"
+       PAYTECH_API_SECRET = "votre_secret"
+       ```
+    2. Si tu es en **Local** : Crée le fichier `.streamlit/secrets.toml`.
+    """)
     st.stop()
+
+PAYTECH_API_KEY = st.secrets["PAYTECH_API_KEY"]
+PAYTECH_API_SECRET = st.secrets["PAYTECH_API_SECRET"]
 
 PAYTECH_URL = "https://paytech.sn/api/payment/request-payment"
 
+# --- 2. FONCTION DE PAIEMENT PAYTECH ---
 # --- 2. FONCTION DE PAIEMENT PAYTECH ---
 def initier_paiement(nom_complet):
     payload = {
@@ -149,10 +161,12 @@ def initier_paiement(nom_complet):
         "currency": "XOF",
         "ref_command": f"AMEEK_{int(datetime.datetime.now().timestamp())}",
         "command_name": "Carte de Membre Officielle",
-        "env": "test", # Changez en 'prod' quand vous serez prêt
+        "env": "test", 
+        "ipn_url": "https://ameek-adhesion.streamlit.app", # <-- AJOUTE CETTE LIGNE
         "success_url": "https://ameek-adhesion.streamlit.app",
         "cancel_url": "https://ameek-adhesion.streamlit.app",
     }
+    # ... le reste de ton code ne change pas
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -212,57 +226,75 @@ elif st.session_state['etape'] == 'paiement':
         st.rerun()
 
 # --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE (Design test.jpeg) ---
+# --- ÉTAPE 3 : GÉNÉRATION DE LA CARTE ---
 elif st.session_state['etape'] == 'carte':
     data = st.session_state['temp_data']
-    
-    # Création de l'image
     largeur, hauteur = 1000, 600
     carte = Image.new('RGB', (largeur, hauteur), color='white')
     dessin = ImageDraw.Draw(carte)
-    
     color_green = (11, 108, 62)
-    
+
     try:
-        # Logos aux deux coins
-        logo = Image.open("logo.jpeg").resize((120, 120))
+        # 1. CHARGEMENT DES POLICES (Noms renommés)
+        # Si font.ttf n'est pas trouvé, le code affichera l'erreur en bas
+        font_large = ImageFont.truetype("font_bold.ttf", 60) # AMEEK
+        font_sub = ImageFont.truetype("font_bold.ttf", 30)   # Amicale...
+        font_main = ImageFont.truetype("font.ttf", 38)        # Infos
+        font_status = ImageFont.truetype("font_bold.ttf", 42)# Statut
+
+        # 2. LOGOS
+        logo = Image.open("logo.jpeg").resize((140, 140))
         carte.paste(logo, (30, 20))
-        carte.paste(logo, (largeur-150, 20))
+        carte.paste(logo, (largeur-170, 20))
+
+        # 3. TEXTES D'EN-TÊTE CENTRÉS
+        # Centrage AMEEK
+        bbox1 = dessin.textbbox((0, 0), "AMEEK", font=font_large)
+        w1 = bbox1[2] - bbox1[0]
+        dessin.text(((largeur - w1) / 2, 35), "AMEEK", fill=color_green, font=font_large)
+
+        # Centrage Sous-titre
+        txt2 = "AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI"
+        bbox2 = dessin.textbbox((0, 0), txt2, font=font_sub)
+        w2 = bbox2[2] - bbox2[0]
+        dessin.text(((largeur - w2) / 2, 110), txt2, fill="black", font=font_sub)
+
+        # 4. BARRE VERTE ET TEXTE
+        barre_y = 175
+        dessin.rectangle([0, barre_y, largeur, barre_y + 75], fill=color_green)
+        txt3 = "CARTE MEMBRE DE L'AMEEK"
+        bbox3 = dessin.textbbox((0, 0), txt3, font=font_sub)
+        w3, h3 = bbox3[2] - bbox3[0], bbox3[3] - bbox3[1]
+        dessin.text(((largeur - w3) / 2, barre_y + (75 - h3) / 2 - 5), txt3, fill="white", font=font_sub)
+
+        # 5. PHOTO (Alignée sous la barre verte)
+        photo_raw = Image.open(io.BytesIO(data['photo']))
+        photo_img = ImageOps.fit(photo_raw, (300, 350))
+        carte.paste(photo_img, (40, barre_y + 75))
+
+        # 6. INFOS À DROITE
+        x_txt = 380
+        y_start = barre_y + 110
+        dessin.text((x_txt, y_start), f"Tel : {data['tel']}", fill="black", font=font_main)
+        dessin.text((x_txt, y_start + 70), f"Prénom : {data['prenom']}", fill="black", font=font_main)
+        dessin.text((x_txt, y_start + 140), f"Noms : {data['noms']}", fill="black", font=font_main)
         
-        # En-tête
-        dessin.text((380, 40), "AMEEK", fill=color_green, font=None) # Utilise defaut si pas de .ttf
-        dessin.text((250, 110), "AMICALE DES ÉLÈVES ET ÉTUDIANTS DE KOKI", fill="black")
-        
-        # Bandeau vert
-        dessin.rectangle([0, 160, largeur, 230], fill=color_green)
-        dessin.text((320, 175), "CARTE MEMBRE DE L'AMEEK", fill="white")
-        
-        # Photo du membre
-        photo_img = Image.open(io.BytesIO(data['photo'])).resize((300, 350))
-        carte.paste(photo_img, (40, 250))
-        
-        # Infos Texte
-        x_txt = 450
-        y_txt = 260
-        dessin.text((x_txt, y_txt), f"Tel : {data['tel']}", fill="black")
-        dessin.text((x_txt, y_txt+60), f"Prénom : {data['prenom']}", fill="black")
-        dessin.text((x_txt, y_txt+120), f"Noms : {data['noms']}", fill="black")
-        
-        # Statut (Case à cocher)
-        status_txt = f"{data['statut']} [ X ]"
-        dessin.text((x_txt, y_txt+200), status_txt, fill=color_green)
-        
-        # QR Code
-        qr = qrcode.make("https://www.ameek.sn").resize((150, 150))
-        carte.paste(qr, (largeur-200, 350))
-        dessin.text((largeur-180, 510), "VALIDER", fill=color_green)
-        dessin.text((largeur-210, 540), "WWW.AMEEK.SN", fill=color_green)
-        
+        # Statut Vert
+        dessin.text((x_txt, y_start + 230), f"{data['statut']} [ X ]", fill=color_green, font=font_status)
+
+        # 7. QR CODE
+        qr = qrcode.make("https://www.ameek.sn").resize((140, 140))
+        carte.paste(qr, (largeur-210, 380))
+        dessin.text((largeur-190, 525), "VALIDER", fill=color_green, font=font_sub)
+        dessin.text((largeur-235, 555), "WWW.AMEEK.SN", fill=color_green, font=font_sub)
+
+        # AFFICHAGE
         st.image(carte, use_container_width=True)
         
-        # Download
+        # BOUTON TÉLÉCHARGEMENT
         buf = io.BytesIO()
         carte.save(buf, format="PNG")
-        st.download_button("📥 TÉLÉCHARGER MA CARTE", buf.getvalue(), "carte_ameek.png", "image/png")
-        
+        st.download_button("📥 TÉLÉCHARGER MA CARTE", buf.getvalue(), f"Carte_{data['noms']}.png", "image/png")
+
     except Exception as e:
-        st.error(f"Erreur d'image : {e}")
+        st.error(f"Erreur : {e}. Vérifiez que 'font.ttf' et 'font_bold.ttf' sont à la racine de votre GitHub.")
